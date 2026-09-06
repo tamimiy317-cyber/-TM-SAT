@@ -802,25 +802,20 @@ private fun SmallAction(
     }
 }
 
-private fun createDeviceCode(
-    context: Context
-): String {
+private fun createDeviceCode(context: Context): String {
+    val androidId = Settings.Secure.getString(
+        context.contentResolver,
+        Settings.Secure.ANDROID_ID
+    ) ?: "TM-SAT"
 
-    val androidId =
-        Settings.Secure.getString(
-            context.contentResolver,
-            Settings.Secure.ANDROID_ID
-        ) ?: "TM-SAT"
-
-    val digest =
-        MessageDigest
-            .getInstance("SHA-256")
-            .digest(androidId.toByteArray())
+    val digest = MessageDigest
+        .getInstance("SHA-256")
+        .digest(androidId.toByteArray())
 
     return digest
-        .take(😎
-        .joinToString("") {
-            "%02X".format(it)
+        .take(8)
+        .joinToString("") { byte ->
+            "%02X".format(byte)
         }
         .chunked(4)
         .joinToString("-")
