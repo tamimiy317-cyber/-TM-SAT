@@ -938,7 +938,7 @@ private fun createDeviceCode(
             )
 
     return digest
-        .take(😎
+        .take(8
         .joinToString("") { byte ->
             "%02X".format(byte)
         }
