@@ -765,17 +765,12 @@ private fun HomeCard(
     }
 }
 
-private data class ActivationResponse(
-    val success: Boolean,
-    val code: String = "",
-    val expiresAt: String = "",
-    val message: String = ""
-)
+
 
 private fun activateCode(
     code: String,
     deviceId: String
-): ActivationResponse {
+): ActivationResult {
 
     val baseUrl =
         ApiConfig.TM_SAT_API
@@ -860,7 +855,7 @@ private fun activateCode(
             )
         ) {
 
-            return ActivationResponse(
+            return ActivationResult(
                 success = true,
                 code =
                     json.optString(
@@ -909,7 +904,7 @@ private fun activateCode(
                     }
             }
 
-        return ActivationResponse(
+        return ActivationResult(
             success = false,
             message = message
         )
