@@ -8,92 +8,198 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
 import java.security.MessageDigest
 
-private val Navy = Color(0xFF021A2B)
-private val Navy2 = Color(0xFF052B46)
-private val Navy3 = Color(0xFF07395B)
-private val Gold = Color(0xFFFFB800)
-private val White = Color(0xFFF7F7F7)
-private val Muted = Color(0xFF9FB3C3)
+private val Navy = Color(0xFF001321)
+private val Panel = Color(0xE6032035)
+private val Panel2 = Color(0xE60A3655)
+private val Gold = Color(0xFFFFC531)
+private val White = Color(0xFFF7F8FA)
+private val Muted = Color(0xFFB8C5CE)
 
 class MainActivity : ComponentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         setContent {
             MaterialTheme {
-                TmSatApp()
+                TmSatApp(this)
             }
         }
     }
 }
 
 @Composable
-fun TmSatApp() {
-    var screen by remember { mutableStateOf("splash") }
+private fun TmSatApp(context: Context) {
+
+    val prefs = remember {
+        context.getSharedPreferences(
+            "tm_sat_prefs",
+            Context.MODE_PRIVATE
+        )
+    }
+
+    var screen by remember {
+        mutableStateOf("splash")
+    }
+
+    var expiresAt by remember {
+        mutableStateOf(
+            prefs.getString("expires_at", "") ?: ""
+        )
+    }
+
+    var activationCode by remember {
+        mutableStateOf(
+            prefs.getString("activation_code", "") ?: ""
+        )
+    }
+
+    val alreadyActivated = remember {
+        prefs.getBoolean("activated", false)
+    }
 
     LaunchedEffect(Unit) {
         delay(1600)
-        screen = "activation"
+
+        screen =
+            if (alreadyActivated) {
+                "home"
+            } else {
+                "activation"
+            }
     }
 
     when (screen) {
-        "splash" -> SplashScreen()
-        "activation" -> ActivationScreen {
-            screen = "home"
+
+        "splash" -> {
+            SplashScreen()
         }
-        else -> HomeScreen {
-            screen = "activation"
+
+        "activation" -> {
+            ActivationScreen(
+                context = context,
+                onActivated = { code, expiry ->
+
+                    activationCode = code
+                    expiresAt = expiry
+
+                    prefs.edit()
+                        .putBoolean("activated", true)
+                        .putString("activation_code", code)
+                        .putString("expires_at", expiry)
+                        .apply()
+
+                    screen = "home"
+                }
+            )
+        }
+
+        else -> {
+            HomeScreen(
+                activationCode = activationCode,
+                expiresAt = expiresAt,
+                onLogout = {
+
+                    prefs.edit()
+                        .clear()
+                        .apply()
+
+                    activationCode = ""
+                    expiresAt = ""
+
+                    screen = "activation"
+                }
+            )
         }
     }
 }
 
 @Composable
 private fun SplashScreen() {
+
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        Color(0xFF001321),
-                        Navy,
-                        Color(0xFF043B60)
-                    )
-                )
-            ),
+        modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
+
+        Image(
+            painter = painterResource(
+                R.drawable.tm_sat_banner
+            ),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Color.Black.copy(
+                        alpha = 0.55f
+                    )
+                )
+        )
+
         Column(
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment =
+                Alignment.CenterHorizontally
         ) {
+
             Image(
-                painter = painterResource(R.drawable.tm_sat_logo),
+                painter = painterResource(
+                    R.drawable.tm_sat_logo
+                ),
                 contentDescription = "TM SAT",
-                modifier = Modifier.size(330.dp),
+                modifier = Modifier.size(310.dp),
                 contentScale = ContentScale.Fit
             )
 
@@ -101,10 +207,12 @@ private fun SplashScreen() {
                 text = "TV • MOVIES • ENTERTAINMENT",
                 color = Gold,
                 fontSize = 17.sp,
-                letterSpacing = 2.sp
+                fontWeight = FontWeight.Bold
             )
 
-            Spacer(Modifier.height(10.dp))
+            Spacer(
+                modifier = Modifier.height(10.dp)
+            )
 
             Text(
                 text = "More Than TV",
@@ -117,429 +225,43 @@ private fun SplashScreen() {
 
 @Composable
 private fun ActivationScreen(
-    onActivated: () -> Unit
+    context: Context,
+    onActivated: (
+        code: String,
+        expiry: String
+    ) -> Unit
 ) {
-    val context = LocalContext.current
+
+    var code by remember {
+        mutableStateOf("")
+    }
+
+    var loading by remember {
+        mutableStateOf(false)
+    }
+
+    var message by remember {
+        mutableStateOf("")
+    }
+
+    var isError by remember {
+        mutableStateOf(false)
+    }
+
+    val scope = rememberCoroutineScope()
+
     val deviceCode = remember {
         createDeviceCode(context)
     }
 
-    Row(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Navy)
-    ) {
-
-        Box(
-            modifier = Modifier
-                .weight(0.9f)
-                .fillMaxHeight()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            Navy2,
-                            Navy
-                        )
-                    )
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Image(
-                    painter = painterResource(R.drawable.tm_sat_logo),
-                    contentDescription = null,
-                    modifier = Modifier.size(300.dp),
-                    contentScale = ContentScale.Fit
-                )
-
-                Text(
-                    "TM SAT",
-                    color = White,
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Text(
-                    "More Than TV",
-                    color = Gold,
-                    fontSize = 17.sp
-                )
-            }
-        }
-
-        Column(
-            modifier = Modifier
-                .weight(1.1f)
-                .fillMaxHeight()
-                .padding(42.dp),
-            verticalArrangement = Arrangement.Center
-        ) {
-
-            Text(
-                "تفعيل الجهاز",
-                color = White,
-                fontSize = 38.sp,
-                fontWeight = FontWeight.ExtraBold
-            )
-
-            Spacer(Modifier.height(10.dp))
-
-            Text(
-                "الرجاء إدخال كود التفعيل المرسل لك من الموزع",
-                color = Muted,
-                fontSize = 18.sp
-            )
-
-            Spacer(Modifier.height(28.dp))
-
-            Surface(
-                color = Navy2,
-                shape = RoundedCornerShape(14.dp),
-                border = androidx.compose.foundation.BorderStroke(
-                    1.dp,
-                    Gold.copy(alpha = .35f)
-                )
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(22.dp)
-                ) {
-
-                    Text(
-                        "كود الجهاز",
-                        color = Gold,
-                        fontSize = 16.sp
-                    )
-
-                    Spacer(Modifier.height(10.dp))
-
-                    Text(
-                        deviceCode,
-                        color = White,
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 2.sp
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(24.dp))
-
-            Button(
-                onClick = onActivated,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(58.dp)
-                    .focusable(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Gold
-                ),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text(
-                    "تفعيل",
-                    color = Navy,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            Spacer(Modifier.height(18.dp))
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                SmallAction("حالة الاشتراك")
-                SmallAction("إعدادات الشبكة")
-            }
-        }
-    }
-}
-
-data class MenuItem(
-    val symbol: String,
-    val title: String
-)
-
-data class ContentItem(
-    val title: String,
-    val subtitle: String
-)
-
-@Composable
-private fun HomeScreen(
-    onLogout: () -> Unit
-) {
-
-    val menu = listOf(
-        MenuItem("⌂", "الرئيسية"),
-        MenuItem("▣", "القنوات"),
-        MenuItem("●", "الأفلام"),
-        MenuItem("▤", "المسلسلات"),
-        MenuItem("☺", "أطفال"),
-        MenuItem("★", "المفضلة"),
-        MenuItem("⌕", "بحث"),
-        MenuItem("⚙", "الإعدادات")
-    )
-
-    val latest = listOf(
-        ContentItem("العميد", "مسلسل"),
-        ContentItem("صلاح الدين", "مسلسل"),
-        ContentItem("المندوب", "مسلسل"),
-        ContentItem("لعبة حب", "مسلسل"),
-        ContentItem("الزمن", "مسلسل"),
-        ContentItem("عائلة شاكر باشا", "مسلسل")
-    )
-
-    Row(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Navy)
-    ) {
-
-        Sidebar(
-            items = menu,
-            onLogout = onLogout
-        )
-
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight()
-                .padding(
-                    start = 22.dp,
-                    end = 26.dp,
-                    top = 18.dp,
-                    bottom = 18.dp
-                )
-        ) {
-
-            TopHeader()
-
-            Spacer(Modifier.height(14.dp))
-
-            HeroBanner()
-
-            Spacer(Modifier.height(18.dp))
-
-            MainCategories()
-
-            Spacer(Modifier.height(20.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "أحدث الإضافات",
-                    color = White,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Spacer(Modifier.weight(1f))
-
-                Text(
-                    "عرض الكل ←",
-                    color = Muted,
-                    fontSize = 15.sp
-                )
-            }
-
-            Spacer(Modifier.height(12.dp))
-
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                items(latest) {
-                    ContentPoster(it)
-                }
-            }
-
-            Spacer(Modifier.weight(1f))
-
-            BottomActions()
-        }
-    }
-}
-
-@Composable
-private fun Sidebar(
-    items: List<MenuItem>,
-    onLogout: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .width(205.dp)
-            .fillMaxHeight()
-            .background(Color(0xFF011522))
-            .padding(14.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-
-        Image(
-            painter = painterResource(R.drawable.tm_sat_logo),
-            contentDescription = null,
-            modifier = Modifier
-                .width(150.dp)
-                .height(100.dp),
-            contentScale = ContentScale.Fit
-        )
-
-        Spacer(Modifier.height(10.dp))
-
-        items.forEachIndexed { index, item ->
-            SidebarItem(
-                item = item,
-                selected = index == 0
-            )
-
-            Spacer(Modifier.height(5.dp))
-        }
-
-        Spacer(Modifier.weight(1f))
-
-        Text(
-            "More Than TV",
-            color = Gold,
-            fontSize = 17.sp,
-            fontWeight = FontWeight.SemiBold
-        )
-
-        Spacer(Modifier.height(10.dp))
-
-        Text(
-            "خروج",
-            color = Muted,
-            modifier = Modifier
-                .clickable { onLogout() }
-                .padding(10.dp)
-        )
-    }
-}
-
-@Composable
-private fun SidebarItem(
-    item: MenuItem,
-    selected: Boolean
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(50.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(
-                if (selected)
-                    Gold
-                else
-                    Color.Transparent
-            )
-            .border(
-                width = if (selected) 0.dp else 1.dp,
-                color = if (selected)
-                    Color.Transparent
-                else
-                    Navy3,
-                shape = RoundedCornerShape(10.dp)
-            )
-            .focusable()
-            .padding(horizontal = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-
-        Text(
-            item.symbol,
-            color = if (selected) Navy else White,
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold
-        )
-
-        Spacer(Modifier.width(14.dp))
-
-        Text(
-            item.title,
-            color = if (selected) Navy else White,
-            fontSize = 17.sp,
-            fontWeight = if (selected)
-                FontWeight.Bold
-            else
-                FontWeight.Normal
-        )
-    }
-}
-
-@Composable
-private fun TopHeader() {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-
-        Text(
-            "TM SAT",
-            color = Gold,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold
-        )
-
-        Spacer(Modifier.weight(1f))
-
-        Column(
-            horizontalAlignment = Alignment.End
-        ) {
-            Text(
-                "12:45",
-                color = White,
-                fontSize = 21.sp,
-                fontWeight = FontWeight.Bold
-            )
-
-            Text(
-                "السبت",
-                color = Muted,
-                fontSize = 12.sp
-            )
-        }
-
-        Spacer(Modifier.width(18.dp))
-
-        Text(
-            "◉",
-            color = White,
-            fontSize = 22.sp
-        )
-
-        Spacer(Modifier.width(16.dp))
-
-        Text(
-            "⚙",
-            color = White,
-            fontSize = 22.sp
-        )
-    }
-}
-
-@Composable
-private fun HeroBanner() {
-
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(230.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .background(Navy2)
-            .border(
-                1.dp,
-                Gold.copy(alpha = .25f),
-                RoundedCornerShape(18.dp)
-            )
+        modifier = Modifier.fillMaxSize()
     ) {
 
         Image(
-            painter = painterResource(R.drawable.tm_sat_banner),
+            painter = painterResource(
+                R.drawable.tm_sat_banner
+            ),
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop
@@ -549,271 +271,674 @@ private fun HeroBanner() {
             modifier = Modifier
                 .fillMaxSize()
                 .background(
-                    Brush.horizontalGradient(
-                        listOf(
-                            Color.Black.copy(alpha = .72f),
-                            Color.Black.copy(alpha = .30f),
-                            Color.Transparent
-                        )
-                    )
+                    Color(0xC900101D)
                 )
         )
 
-        Column(
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .padding(30.dp)
+        Row(
+            modifier = Modifier.fillMaxSize()
         ) {
 
-            Text(
-                "فلسطين",
-                color = White,
-                fontSize = 40.sp,
-                fontWeight = FontWeight.ExtraBold
-            )
-
-            Spacer(Modifier.height(8.dp))
-
-            Text(
-                "أحدث المحتويات الآن على TM SAT",
-                color = White.copy(alpha = .85f),
-                fontSize = 17.sp
-            )
-
-            Spacer(Modifier.height(16.dp))
-
-            Surface(
-                color = Gold,
-                shape = RoundedCornerShape(30.dp)
+            Box(
+                modifier = Modifier
+                    .weight(0.9f)
+                    .fillMaxHeight(),
+                contentAlignment = Alignment.Center
             ) {
-                Text(
-                    "▶ شاهد الآن",
-                    color = Navy,
-                    modifier = Modifier.padding(
-                        horizontal = 24.dp,
-                        vertical = 11.dp
-                    ),
-                    fontWeight = FontWeight.Bold
-                )
+
+                Column(
+                    horizontalAlignment =
+                        Alignment.CenterHorizontally
+                ) {
+
+                    Image(
+                        painter = painterResource(
+                            R.drawable.tm_sat_logo
+                        ),
+                        contentDescription = "TM SAT",
+                        modifier = Modifier.size(300.dp),
+                        contentScale = ContentScale.Fit
+                    )
+
+                    Text(
+                        text =
+                            "TV • MOVIES • ENTERTAINMENT",
+                        color = Gold,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .weight(1.1f)
+                    .fillMaxHeight()
+                    .padding(40.dp),
+                contentAlignment = Alignment.Center
+            ) {
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            Panel,
+                            RoundedCornerShape(22.dp)
+                        )
+                        .padding(30.dp),
+                    horizontalAlignment =
+                        Alignment.CenterHorizontally
+                ) {
+
+                    Text(
+                        text = "تفعيل TM SAT",
+                        color = Gold,
+                        fontSize = 30.sp,
+                        fontWeight =
+                            FontWeight.ExtraBold
+                    )
+
+                    Spacer(
+                        modifier = Modifier.height(8.dp)
+                    )
+
+                    Text(
+                        text =
+                            "أدخل كود الاشتراك",
+                        color = White,
+                        fontSize = 17.sp
+                    )
+
+                    Spacer(
+                        modifier = Modifier.height(24.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = code,
+                        onValueChange = {
+                            code = it
+                                .uppercase()
+                                .trim()
+                        },
+                        singleLine = true,
+                        label = {
+                            Text("كود التفعيل")
+                        },
+                        colors =
+                            OutlinedTextFieldDefaults
+                                .colors(
+                                    focusedTextColor =
+                                        White,
+                                    unfocusedTextColor =
+                                        White,
+                                    focusedBorderColor =
+                                        Gold,
+                                    unfocusedBorderColor =
+                                        Muted,
+                                    focusedLabelColor =
+                                        Gold,
+                                    unfocusedLabelColor =
+                                        Muted,
+                                    cursorColor = Gold
+                                ),
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(
+                        modifier = Modifier.height(14.dp)
+                    )
+
+                    Text(
+                        text =
+                            "رقم الجهاز: $deviceCode",
+                        color = Muted,
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center
+                    )
+
+                    if (message.isNotBlank()) {
+
+                        Spacer(
+                            modifier =
+                                Modifier.height(14.dp)
+                        )
+
+                        Text(
+                            text = message,
+                            color =
+                                if (isError) {
+                                    Color(0xFFFF7777)
+                                } else {
+                                    Color(0xFF65E59A)
+                                },
+                            fontSize = 15.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+
+                    Spacer(
+                        modifier = Modifier.height(22.dp)
+                    )
+
+                    Button(
+                        onClick = {
+
+                            if (code.isBlank()) {
+                                message =
+                                    "أدخل كود التفعيل"
+                                isError = true
+                                return@Button
+                            }
+
+                            loading = true
+                            message = ""
+                            isError = false
+
+                            scope.launch {
+
+                                try {
+
+                                    val result =
+                                        withContext(
+                                            Dispatchers.IO
+                                        ) {
+                                            activateCode(
+                                                code = code,
+                                                deviceId =
+                                                    deviceCode
+                                            )
+                                        }
+
+                                    if (result.success) {
+
+                                        message =
+                                            "تم التفعيل بنجاح"
+
+                                        isError = false
+
+                                        onActivated(
+                                            result.code,
+                                            result.expiresAt
+                                        )
+
+                                    } else {
+
+                                        message =
+                                            result.message
+
+                                        isError = true
+                                    }
+
+                                } catch (
+                                    e: Exception
+                                ) {
+
+                                    message =
+                                        e.message
+                                            ?: "تعذر الاتصال بالسيرفر"
+
+                                    isError = true
+
+                                } finally {
+
+                                    loading = false
+                                }
+                            }
+                        },
+                        enabled = !loading,
+                        colors =
+                            ButtonDefaults
+                                .buttonColors(
+                                    containerColor = Gold
+                                ),
+                        shape =
+                            RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(58.dp)
+                            .focusable()
+                    ) {
+
+                        if (loading) {
+
+                            CircularProgressIndicator(
+                                modifier =
+                                    Modifier.size(24.dp),
+                                strokeWidth = 2.dp,
+                                color = Navy
+                            )
+
+                        } else {
+
+                            Text(
+                                text = "تفعيل",
+                                color =
+                                    Color(0xFF151515),
+                                fontSize = 19.sp,
+                                fontWeight =
+                                    FontWeight.Bold
+                            )
+                        }
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun MainCategories() {
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-
-        HomeCategory(
-            modifier = Modifier.weight(1f),
-            symbol = "▣",
-            ar = "القنوات المباشرة",
-            en = "LIVE TV",
-            accent = Color(0xFF0879D9)
-        )
-
-        HomeCategory(
-            modifier = Modifier.weight(1f),
-            symbol = "●",
-            ar = "الأفلام",
-            en = "MOVIES",
-            accent = Color(0xFF73501F)
-        )
-
-        HomeCategory(
-            modifier = Modifier.weight(1f),
-            symbol = "▤",
-            ar = "المسلسلات",
-            en = "SERIES",
-            accent = Color(0xFF393B96)
-        )
-
-        HomeCategory(
-            modifier = Modifier.weight(1f),
-            symbol = "☺",
-            ar = "أطفال",
-            en = "KIDS",
-            accent = Color(0xFF188E6E)
-        )
-    }
-}
-
-@Composable
-private fun HomeCategory(
-    modifier: Modifier,
-    symbol: String,
-    ar: String,
-    en: String,
-    accent: Color
+private fun HomeScreen(
+    activationCode: String,
+    expiresAt: String,
+    onLogout: () -> Unit
 ) {
 
-    Column(
-        modifier = modifier
-            .height(132.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        accent,
-                        Navy2
-                    )
+    Box(
+        modifier = Modifier.fillMaxSize()
+    ) {
+
+        Image(
+            painter = painterResource(
+                R.drawable.tm_sat_banner
+            ),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Color(0xD0001424)
                 )
-            )
-            .border(
-                1.dp,
-                Gold.copy(alpha = .35f),
-                RoundedCornerShape(14.dp)
-            )
-            .focusable()
-            .clickable { }
-            .padding(14.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-
-        Text(
-            symbol,
-            color = Gold,
-            fontSize = 30.sp,
-            fontWeight = FontWeight.Black
         )
 
-        Spacer(Modifier.height(7.dp))
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(30.dp)
+        ) {
 
-        Text(
-            ar,
-            color = White,
-            fontSize = 17.sp,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center
-        )
+            Row(
+                verticalAlignment =
+                    Alignment.CenterVertically
+            ) {
 
-        Text(
-            en,
-            color = Gold,
-            fontSize = 11.sp,
-            letterSpacing = 1.sp
-        )
-    }
-}
-
-@Composable
-private fun ContentPoster(
-    item: ContentItem
-) {
-
-    Column(
-        modifier = Modifier
-            .width(150.dp)
-            .height(180.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        Navy3,
-                        Color(0xFF01131F)
-                    )
+                Image(
+                    painter = painterResource(
+                        R.drawable.tm_sat_logo
+                    ),
+                    contentDescription = "TM SAT",
+                    modifier = Modifier
+                        .width(170.dp)
+                        .height(85.dp),
+                    contentScale = ContentScale.Fit
                 )
+
+                Spacer(
+                    modifier = Modifier.weight(1f)
+                )
+
+                Text(
+                    text = "TM SAT",
+                    color = Gold,
+                    fontSize = 30.sp,
+                    fontWeight =
+                        FontWeight.ExtraBold
+                )
+            }
+
+            Spacer(
+                modifier = Modifier.height(24.dp)
             )
-            .border(
-                1.dp,
-                Gold.copy(alpha = .25f),
-                RoundedCornerShape(12.dp)
+
+            Text(
+                text = "مرحباً بك في TM SAT",
+                color = White,
+                fontSize = 31.sp,
+                fontWeight = FontWeight.Bold
             )
-            .focusable()
-            .clickable { }
-            .padding(12.dp),
-        verticalArrangement = Arrangement.Bottom
-    ) {
 
-        Text(
-            "TM",
-            color = Gold.copy(alpha = .55f),
-            fontSize = 36.sp,
-            fontWeight = FontWeight.Black
-        )
+            Spacer(
+                modifier = Modifier.height(8.dp)
+            )
 
-        Spacer(Modifier.weight(1f))
+            Text(
+                text = "تم تفعيل الجهاز بنجاح",
+                color = Gold,
+                fontSize = 18.sp
+            )
 
-        Text(
-            item.title,
-            color = White,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold
-        )
+            if (expiresAt.isNotBlank()) {
 
-        Text(
-            item.subtitle,
-            color = Muted,
-            fontSize = 11.sp
-        )
+                Spacer(
+                    modifier = Modifier.height(5.dp)
+                )
+
+                Text(
+                    text =
+                        "تاريخ انتهاء الاشتراك: $expiresAt",
+                    color = Muted,
+                    fontSize = 14.sp
+                )
+            }
+
+            Spacer(
+                modifier = Modifier.height(30.dp)
+            )
+
+            Row(
+                horizontalArrangement =
+                    Arrangement.spacedBy(18.dp)
+            ) {
+
+                HomeCard(
+                    title = "القنوات",
+                    subtitle = "LIVE TV"
+                )
+
+                HomeCard(
+                    title = "الأفلام",
+                    subtitle = "MOVIES"
+                )
+
+                HomeCard(
+                    title = "المسلسلات",
+                    subtitle = "SERIES"
+                )
+
+                HomeCard(
+                    title = "الأطفال",
+                    subtitle = "KIDS"
+                )
+            }
+
+            Spacer(
+                modifier = Modifier.height(28.dp)
+            )
+
+            Surface(
+                color = Panel,
+                shape =
+                    RoundedCornerShape(20.dp),
+                modifier =
+                    Modifier.fillMaxWidth()
+            ) {
+
+                Column(
+                    modifier =
+                        Modifier.padding(24.dp)
+                ) {
+
+                    Text(
+                        text = "الاشتراك فعّال",
+                        color = Gold,
+                        fontSize = 22.sp,
+                        fontWeight =
+                            FontWeight.Bold
+                    )
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(8.dp)
+                    )
+
+                    Text(
+                        text =
+                            "كود الاشتراك: $activationCode",
+                        color = White,
+                        fontSize = 16.sp
+                    )
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(5.dp)
+                    )
+
+                    Text(
+                        text =
+                            "هذا الجهاز مربوط بالكود.",
+                        color = Muted,
+                        fontSize = 15.sp
+                    )
+                }
+            }
+
+            Spacer(
+                modifier = Modifier.weight(1f)
+            )
+
+            Text(
+                text = "إلغاء التفعيل من هذا الجهاز",
+                color = Muted,
+                modifier = Modifier
+                    .clickable {
+                        onLogout()
+                    }
+                    .padding(12.dp)
+            )
+        }
     }
 }
 
 @Composable
-private fun BottomActions() {
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-
-        SmallAction("الحساب")
-        SmallAction("تفعيل كود")
-        SmallAction("معلومات الجهاز")
-        SmallAction("تغيير اللغة")
-
-        Spacer(Modifier.weight(1f))
-
-        Text(
-            "YouTube   Facebook   Instagram",
-            color = Muted,
-            fontSize = 12.sp
-        )
-    }
-}
-
-@Composable
-private fun SmallAction(
-    text: String
+private fun HomeCard(
+    title: String,
+    subtitle: String
 ) {
 
     Surface(
-        color = Navy2,
-        shape = RoundedCornerShape(22.dp),
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            Gold.copy(alpha = .25f)
-        )
+        color = Panel2,
+        shape = RoundedCornerShape(18.dp),
+        modifier = Modifier
+            .width(190.dp)
+            .height(125.dp)
+            .focusable()
     ) {
-        Text(
-            text,
-            color = White,
-            modifier = Modifier.padding(
-                horizontal = 18.dp,
-                vertical = 9.dp
-            ),
-            fontSize = 13.sp
-        )
+
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement =
+                Arrangement.Center
+        ) {
+
+            Text(
+                text = title,
+                color = White,
+                fontSize = 21.sp,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(
+                modifier = Modifier.height(6.dp)
+            )
+
+            Text(
+                text = subtitle,
+                color = Gold,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
     }
 }
 
-private fun createDeviceCode(context: Context): String {
-    val androidId = Settings.Secure.getString(
-        context.contentResolver,
-        Settings.Secure.ANDROID_ID
-    ) ?: "TM-SAT"
+private data class ActivationResponse(
+    val success: Boolean,
+    val code: String = "",
+    val expiresAt: String = "",
+    val message: String = ""
+)
 
-    val digest = MessageDigest
-        .getInstance("SHA-256")
-        .digest(androidId.toByteArray())
+private fun activateCode(
+    code: String,
+    deviceId: String
+): ActivationResponse {
+
+    val baseUrl =
+        ApiConfig.TM_SAT_API
+            .trimEnd('/')
+
+    val url =
+        URL("$baseUrl/api/activate")
+
+    val connection =
+        url.openConnection()
+            as HttpURLConnection
+
+    try {
+
+        connection.requestMethod = "POST"
+
+        connection.connectTimeout = 15000
+        connection.readTimeout = 15000
+
+        connection.doOutput = true
+
+        connection.setRequestProperty(
+            "Content-Type",
+            "application/json"
+        )
+
+        connection.setRequestProperty(
+            "Accept",
+            "application/json"
+        )
+
+        val body =
+            JSONObject()
+                .put(
+                    "code",
+                    code.trim().uppercase()
+                )
+                .put(
+                    "deviceId",
+                    deviceId
+                )
+                .toString()
+
+        connection.outputStream
+            .bufferedWriter()
+            .use {
+                it.write(body)
+            }
+
+        val responseCode =
+            connection.responseCode
+
+        val stream =
+            if (
+                responseCode in 200..299
+            ) {
+                connection.inputStream
+            } else {
+                connection.errorStream
+            }
+
+        val text =
+            stream
+                ?.bufferedReader()
+                ?.use {
+                    it.readText()
+                }
+                ?: ""
+
+        val json =
+            if (text.isNotBlank()) {
+                JSONObject(text)
+            } else {
+                JSONObject()
+            }
+
+        if (
+            responseCode in 200..299 &&
+            json.optBoolean(
+                "ok",
+                false
+            )
+        ) {
+
+            return ActivationResponse(
+                success = true,
+                code =
+                    json.optString(
+                        "code",
+                        code
+                    ),
+                expiresAt =
+                    json.optString(
+                        "expiresAt",
+                        ""
+                    )
+            )
+        }
+
+        val serverError =
+            json.optString(
+                "error",
+                ""
+            )
+
+        val message =
+            when (
+                serverError
+                    .lowercase()
+            ) {
+
+                "invalid code" ->
+                    "الكود غير صحيح"
+
+                "code disabled" ->
+                    "الكود موقوف"
+
+                "code expired" ->
+                    "انتهت صلاحية الكود"
+
+                "code already linked to another device" ->
+                    "الكود مربوط بجهاز آخر"
+
+                else ->
+                    if (
+                        serverError.isNotBlank()
+                    ) {
+                        serverError
+                    } else {
+                        "فشل التفعيل"
+                    }
+            }
+
+        return ActivationResponse(
+            success = false,
+            message = message
+        )
+
+    } finally {
+
+        connection.disconnect()
+    }
+}
+
+private fun createDeviceCode(
+    context: Context
+): String {
+
+    val androidId =
+        Settings.Secure.getString(
+            context.contentResolver,
+            Settings.Secure.ANDROID_ID
+        ) ?: "TM-SAT"
+
+    val digest =
+        MessageDigest
+            .getInstance("SHA-256")
+            .digest(
+                androidId.toByteArray()
+            )
 
     return digest
-        .take(8)
+        .take(😎
         .joinToString("") { byte ->
             "%02X".format(byte)
         }
